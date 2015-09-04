@@ -7,7 +7,7 @@ import arcpy, math
 
 class WholeRoad(object):
     
-    def __init__(self, lineGeometry, field, L_F_Add, L_T_Add, R_F_Add, R_T_Add):
+    def __init__(self, lineGeometry, L_F_Add, L_T_Add, R_F_Add, R_T_Add):
         self.lineGeometry = lineGeometry
         self.leftFromAddr = self.setAddrRangeValue(L_F_Add)
         self.leftToAddr = self.setAddrRangeValue(L_T_Add)
@@ -15,7 +15,6 @@ class WholeRoad(object):
         self.rightToAddr = self.setAddrRangeValue(R_T_Add)
         self.startSide = None
         self.endSide = None
-        self.field = field
         self.id = None
         
     def setId(self, idNum):
@@ -39,11 +38,17 @@ class WholeRoad(object):
         startSideSegment = self.lineGeometry.segmentAlongLine(0,  startSidePercent, use_percentage = True)
         endSideSegment = self.lineGeometry.segmentAlongLine(startSidePercent,  1, use_percentage = True)
         
-        print self.getStartAddrRangeValues(startSidePercent)
-        print self.getStartAddrRangeValues(endSidePercent)
+        startLFrom, startLTo, startRFrom, startRTo = self.getStartAddrRangeValues(startSidePercent)
+        endLFrom,  endLTo,  endRFrom,  endRTo = self.getEndAddrRangeValues(max(startLFrom, startLTo), max(startRFrom, startRTo))
         
-        startRoad = SplitRoad(startSideSegment, "", isStartSide = True)
-        endRoad = SplitRoad(endSideSegment, "", isStartSide = False)
+        print "Start side new addr range: {}, {}, {}, {}".format(startLFrom, startLTo, startRFrom, startRTo)
+        print "End side new addr range: {}, {}, {}, {}".format(endLFrom,  endLTo,  endRFrom,  endRTo)
+        #print self.getEndAddrRangeValues(startRoadNewLeftEnd, startRoadNewRightEnd)
+        
+        startRoad = SplitRoad(startSideSegment, startLFrom, startLTo, startRFrom, startRTo, isStartSide = True)
+        endRoad = SplitRoad(endSideSegment, endLFrom,  endLTo,  endRFrom,  endRTo, isStartSide = False)
+        
+        return (startRoad, endRoad)
         
     def _calculateNewRange(self, currentRange, lengthPercent):
         #currentRange = abs(fromValue - toValue)        
@@ -83,15 +88,19 @@ class WholeRoad(object):
         else:
             
             if self.leftFromAddr < self.leftToAddr:
-                newLTo = self._caclulateNewEndValue(self.leftFromAddr, leftAddrRange, max(self.leftFromAddr, self.leftToAddr))    
+                newLTo = self._caclulateNewEndValue(self.leftFromAddr, leftAddrRange, max(self.leftFromAddr, self.leftToAddr))
+                newLFrom = self.leftFromAddr    
             else:
-                newLFrom = self._caclulateNewEndValue(self.leftToAddr, leftAddrRange, max(self.leftFromAddr, self.leftToAddr))   
+                newLFrom = self._caclulateNewEndValue(self.leftToAddr, leftAddrRange, max(self.leftFromAddr, self.leftToAddr))
+                newLTo = self.leftToAddr   
             
             if self.rightFromAddr < self.rightToAddr:
-                newRTo = self._caclulateNewEndValue(self.rightFromAddr, rightAddrRange, max(self.rightFromAddr, self.rightToAddr)) 
+                newRTo = self._caclulateNewEndValue(self.rightFromAddr, rightAddrRange, max(self.rightFromAddr, self.rightToAddr))
+                newRFrom = self.rightFromAddr 
       
             else:
                 newRFrom = self._caclulateNewEndValue(self.rightToAddr, rightAddrRange, max(self.rightFromAddr, self.rightToAddr))
+                newRTo = self.rightToAddr
                 
         return (newLFrom, newLTo, newRFrom, newRTo)
         
@@ -141,8 +150,8 @@ class WholeRoad(object):
     
 class SplitRoad(WholeRoad):
     
-    def __init__(self, lineGeometry, field, isStartSide):
-        WholeRoad.__init__(self, lineGeometry, field)
+    def __init__(self, lineGeometry, L_F_Add, L_T_Add, R_F_Add, R_T_Add, isStartSide):
+        WholeRoad.__init__(self, lineGeometry, L_F_Add, L_T_Add, R_F_Add, R_T_Add)
         self.isStartSide = isStartSide
         
     def getInsertRow(self):
@@ -153,11 +162,12 @@ class SplitRoad(WholeRoad):
     
 if __name__ == "__main__":
 
-    inFc = r"C:\GIS\Work\TempStuff\TestRoads.gdb\TestRoads_1"
+    inFc = r"C:\KW_Working\AddrRangeSplitAddin\AddRangeSplit.gdb\SingleTestRoad"
     fieldNames = ["SHAPE@", "L_F_ADD", "L_T_ADD", "R_F_ADD", "R_T_ADD"]
     with arcpy.da.SearchCursor(inFc, fieldNames, explode_to_points = False) as cursor:
         for row in cursor:
             print row
-            r = WholeRoad(row[0], "fuckin", row[1], row[2], row[3], row[4])
-            r.getStartAndEndSideRoads(417768.916, 4518470.792)
+            r = WholeRoad(row[0], row[1], row[2], row[3], row[4])
+            startSideRoad, endSideRoad = r.getStartAndEndSideRoads(428705.77, 4332011.096)
+            
             
